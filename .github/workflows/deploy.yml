@@ -3,10 +3,15 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    # index.html di root adalah artefak hasil build (lihat langkah
+    # "Publish built file to repo root"). Abaikan push yang hanya
+    # mengubah file itu supaya workflow tidak memicu dirinya sendiri.
+    paths-ignore:
+      - index.html
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -32,6 +37,23 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Publish built file to repo root
+        # Repo ini memakai Pages mode "Deploy from a branch" (branch main, /)
+        # yang menyajikan file mentah dari repo. Agar mode tersebut menyajikan
+        # aplikasi hasil build (bukan source Vite mentah), hasil single-file
+        # build disalin ke root index.html dan di-commit bila berubah.
+        run: |
+          cp dist/index.html index.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain -- index.html)" ]; then
+            git add index.html
+            git commit -m "chore(pages): update built index.html"
+            git push
+          else
+            echo "index.html is already up to date"
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
